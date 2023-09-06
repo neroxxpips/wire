@@ -1,0 +1,23 @@
+---
+
+- name: stop WNT Docker services
+  shell: "./disable.sh"
+  args:
+    executable: /bin/bash
+    chdir: "{{service_home}}"
+
+- name: remove wnt folder with all the content
+  file:
+    state: absent
+    path: "{{service_home}}"
+
+- name: "remove {{item}} database"
+  shell: "docker volume rm {{item}}"
+  loop: "{{wnt_databases}}"
+  ignore_errors: true
+  when: remove_wnt_databases
+
+- name: "clear users crontab"
+  shell: "crontab -r"
+  ignore_errors: true
+  when: clear_crontab

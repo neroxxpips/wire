@@ -1,0 +1,30 @@
+
+---
+
+## take necessary backups
+- name: get postgres data
+  import_tasks: get_postgres_data.yml
+
+# note these backups happen on remote, therefore service_home in both
+- name: backup old env file for wnt_{{wnt_version}}
+  copy:
+    src: "{{ service_home }}/wnt.env"
+    dest: "{{ service_home }}/wnt_old_before_{{ wnt_version }}.env"
+    remote_src: yes
+    mode: 0664
+
+- name: backup old customer_report.rst file for wnt_{{wnt_version}}
+  copy:
+    src: "{{ service_home }}/customer_report.rst"
+    dest: "{{ service_home }}/customer_report_old_before_{{ wnt_version }}.rst"
+    remote_src: yes
+    mode: 0664
+
+- name: get old wnt.env for modification
+  fetch:
+    src: "{{ service_home }}/wnt.env"
+    dest: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    flat: yes
+    mode: 0664
+    validate_checksum: no
+    fail_on_missing: yes

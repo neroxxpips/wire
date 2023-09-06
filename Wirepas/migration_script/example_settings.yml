@@ -1,0 +1,34 @@
+export_environment:
+  protocol_version: 4
+  PROTOCOL: "wss"
+  AUTHENTICATION_PORT: 8813
+  METADATA_PORT: 8812
+  REALTIME_SITUATION_PORT: 8811
+  log_level: "info"
+  log_file: "export_environment.log"
+  with_trace: False
+  timeout_minutes: 5
+  data_file_name: "data.json"
+  username: "admin"
+  password: ""
+  hostname: ""
+  ignore_cert: False
+  ca_certs: "./ca_cert.crt"
+import_environment:
+  protocol_version: 5
+  PROTOCOL: "wss"
+  AUTHENTICATION_PORT: 8813
+  METADATA_PORT: 8812
+  REALTIME_SITUATION_PORT: 8811
+  log_level: "info"
+  log_file: "import_environment.log"
+  with_trace: False
+  timeout_minutes: 5
+  data_file_name: "data.json"
+  username: "admin"
+  password: ""
+  hostname: ""
+  batch_size: 10
+  batch_delay_seconds: 1.0
+  ignore_cert: False
+  ca_certs: "./ca_cert.crt"

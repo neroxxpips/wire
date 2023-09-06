@@ -1,0 +1,94 @@
+# Wirepas Oy 2021
+#
+# Update WNT3 to WNT4 changes
+#
+# Wirepas Oy
+---
+- name: generate create keys script
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ service_home }}/{{ item }}.sh"
+    mode: 0775
+  loop:
+    - "generate_user_keys"
+
+- name: Check MQTT Username/Password exists?
+  lineinfile:
+    state: absent
+    path: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    regexp: "{{ item.line }}"
+  check_mode: true
+  changed_when: false # This just makes things look prettier in the logs
+  with_items:
+    - { line: '^MQTT_JSON_USERNAME=' }
+    - { line: '^MQTT_JSON_PASSWORD=' }
+  delegate_to: localhost
+  register: check
+
+- name: Debug
+  ansible.builtin.debug:
+    msg: check {{ check.results[0] }}
+
+- name: Debug
+  ansible.builtin.debug:
+    msg: check {{ check.results[0].found }}
+
+- name: Create MQTT_JSON credentials
+  import_tasks: generate_mqttjson_credentials.yml
+  when: check.results[0].found == 0
+
+- name: wnt.env to contain new items
+  lineinfile:
+    path: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    backup: no
+    line: "{{ item.line }}"
+    create: yes
+  with_items:
+    - { line: 'MQTT_JSON_USERNAME={{ wnt_mqtt_json_username }}'}
+    - { line: 'MQTT_JSON_PASSWORD={{ wnt_mqtt_json_password }}'}
+    - { line: 'MQTT_LIBRARY_USERNAME={{ wnt_mqttlib_json_username }}' }
+    - { line: 'MQTT_LIBRARY_PASSWORD={{ wnt_mqttlib_json_password }}' }
+  delegate_to: localhost
+  when: check.results[0].found == 0
+
+- name: wnt.env to contain updated items
+  lineinfile:
+    path: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    backup: no
+    line: "{{ item.line }}"
+    create: yes
+  with_items:
+    - { line: 'MQTT_JSON_TOPIC={{ wnt_mqtt_json_node_data_topic }}'}
+    - { line: 'MQTT_JSON_IS_ON={{ wnt_mqtt_json_is_on | bool | string | lower }}'}
+    - { line: 'MQTT_JSON_IS_OPTIMIZED_ON={{ wnt_mqtt_json_is_optimized_on | bool | string | lower  }}'}
+  delegate_to: localhost
+
+# local modifications to backuped files before replacing the originals
+- name: Update cluster size to correct
+  lineinfile:
+    state: present
+    path: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { line: 'CLUSTER_SIZE={{ wnt_cluster_size }}',
+        regexp: '^CLUSTER_SIZE='
+    }
+    - { line: 'RTSITUATION_DELTA_INTERVAL_IN_MS={{ wnt_rtsituation_interval_ms }}',
+        regexp: '^RTSITUATION_DELTA_INTERVAL_IN_MS='
+    }
+  delegate_to: localhost
+
+- name: copy wnt env file to wnt.yml for transforming
+  copy:
+    src: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    dest: "{{ wnt_storage }}/{{ instance_name }}/wnt.yml"
+    mode: 0664
+  delegate_to: localhost
+
+- name: Transform env file to yaml
+  ansible.builtin.replace:
+    path: "{{ wnt_storage }}/{{ instance_name }}/wnt.yml"
+    regexp: '='
+    replace: ': '
+  delegate_to: localhost

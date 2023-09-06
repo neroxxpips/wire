@@ -1,0 +1,43 @@
+---
+###########################################
+#  Assess current/desired versions
+###########################################
+- name: ensure the WPE services are running
+  import_tasks: selfcheck_wpe_docker_containers.yml
+
+- name: Check WPE version
+  script: "get_version.sh wpe-core"
+  args:
+    chdir: "{{ service_home }}"
+  register: old_wpe_full_version
+
+- name: Determine the old wpe major versions
+  set_fact:
+    old_wpe_major: "{{ old_wpe_full_version.stdout | default(None) | replace('release_', '') | regex_search('(\\d+\\.\\d+)') }}"
+    wpe_major_compare: "{{ wpe_version | replace('dev_', '') | regex_search('(\\d+\\.\\d+)') }}"
+
+###########################################
+#  Validate current vs desired versions
+###########################################
+- name: Validate version compatibility
+  fail:
+    msg: > 
+        Version incompatibility Between WNT4 and WPE. WNT 4 only works with WPE 1.4.0 - WPE 1.6.
+        Please specify the correct versions in vars/update_host.yml file.
+  when: wpe_major_compare | float > 1.6 or wpe_major_compare | float < 1.4
+
+- name: Check that a downgrade is not being attempted
+  fail: 
+    msg: > 
+      Downgrading WPE versions is not supported. 
+      Please make sure that the WPE specified in vars/update_host.yml is greater than the one currently running on the system.
+  when: old_wpe_major and old_wpe_major | float > wpe_major | float
+
+###########################################
+#  Output version validation outcome
+###########################################
+- debug:
+    msg: "{{ item }}"
+  with_items:
+    - "Versions currently running: WPE:{{ old_wpe_full_version.stdout }}"
+    - "Versions to update to: WPE:{{ wpe_version }}"

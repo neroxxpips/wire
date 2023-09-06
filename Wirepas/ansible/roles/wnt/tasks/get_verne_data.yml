@@ -1,0 +1,39 @@
+---
+- name: docker compose down
+  command: "docker compose down"
+  args:
+    chdir: "{{ service_home }}"
+
+- name: dump date version info to file
+  shell: "docker inspect wnt_vernemq_data > verne_data_versioninfo.json"
+  args:
+    chdir: "{{ service_home }}/backups"
+
+- name: tar verne db to host
+  archive:
+    path:
+      - "/var/lib/docker/volumes/wnt_vernemq_data/_data"
+      - "{{ service_home }}/backups/verne_data_versioninfo.json"
+    dest: "{{ service_home }}/backups/verne.tar.gz"
+    format: gz
+  become: true
+  become_method: sudo
+
+- name: fetch vernedata
+  fetch:
+    src: "{{ service_home }}/backups/verne.tar.gz"
+    dest: "{{ wnt_storage }}/{{ instance_name }}/verne.tar.gz"
+    flat: yes
+
+- name: remove verne transfer files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ service_home }}/backups/verne_data_versioninfo.json"
+    - "{{ service_home }}/backups/verne.tar.gz"
+
+- name: docker compose up -d
+  command: "docker compose up -d"
+  args:
+    chdir: "{{ service_home }}"

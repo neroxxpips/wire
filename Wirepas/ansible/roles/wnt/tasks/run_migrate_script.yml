@@ -1,0 +1,65 @@
+# Wirepas Oy 2022
+#
+# Run migrate script to WNT3 instance and take achors
+#
+# Wirepas Oy
+
+---
+
+- name: "Set WNT Websocket protocol according to haproxy existence"
+  set_fact:
+    wnt_websocket_protocol: "wss"
+  when: wnt_statuses_dict['wnt_haproxy'] is defined and wnt_statuses_dict['wnt_haproxy'] == "running"
+
+- name: Include WNT vars into included_wnt_vars variable from YAML
+  include_vars:
+    file: "{{ wnt_storage }}/{{ instance_name }}/wnt.yml"
+    name: included_wnt_vars
+  delegate_to: localhost
+
+- name: Ensure python3-venv exists
+  apt:
+    name: "python3-venv"
+    update_cache: yes
+  become: true
+  become_method: sudo
+  delegate_to: localhost
+
+- name: generate settings file for anchor script
+  template:
+    src: "anchor_export_import.j2"
+    dest: "{{ wnt_storage }}/{{ instance_name }}/anchor_export_import.yml"
+    mode: 0644
+  delegate_to: localhost
+
+- name: Install achor export import dependencies
+  shell: "python3 -m venv .env && .env/bin/pip3 install -r requirements.txt"
+  args:
+    chdir: "../migration_script"
+  delegate_to: localhost
+
+- name: Get WPE anchor node roles to local
+  command: '.env/bin/python3 anchordataexporter.py --settings "{{ wnt_storage }}/{{ instance_name }}/anchor_export_import.yml"'
+  args:
+    chdir: "../migration_script"
+  delegate_to: localhost
+  ignore_errors: true
+  register: export_retval
+
+- name: Print Return value of the export script
+  debug:
+    msg: "{{ export_retval }}"
+
+- name: "WARNING: Will skip anchor import, since there is no anchor data in your backend."
+  set_fact:
+    transfer_wpe_anchor_metadata: false
+  when: export_retval.rc == 6
+
+- name: "Error exporting anchor data from backend."
+  fail:
+    msg: "In case you don't have WPE or don't have positioning anchors use flag -e transfer_wpe_anchor_metadata=false to skip this"
+  when: export_retval.rc != 0 and export_retval.rc != 6
+
+
+
+

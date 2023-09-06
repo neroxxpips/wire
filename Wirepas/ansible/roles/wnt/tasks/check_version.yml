@@ -1,0 +1,72 @@
+---
+- name: include common vars
+  include_vars:
+    file: common.yml
+
+- name: include wnt vars
+  include_vars:
+    file: wnt.yml
+
+###########################################
+#  Assess current/desired versions
+###########################################
+
+- name: ensure the WNT services are running
+  import_tasks: selfcheck_wnt_docker_containers.yml
+
+- name: Check WNT version
+  script: "get_version.sh wnt_parser"
+  args:
+    chdir: "{{ service_home }}"
+  register: old_wnt_full_version
+
+- name: Determine the old wnt major version
+  set_fact:
+    old_wnt_major: "{{ old_wnt_full_version.stdout | default(None) | replace('release_', '') | regex_search('(\\d+\\.\\d+)') }}"
+
+###########################################
+#  Validate current vs desired versions
+###########################################
+- name: Check that the WNT version to update to has been specified
+  fail: 
+    msg: > 
+      Could not find the desired WNT version to update to. 
+      Please specify a WNT version (wnt_version) to update to in vars/update_host.yml file
+  when: wnt_version is defined and (wnt_version == None or wnt_version|string == "None")
+
+- name: Check that a downgrade is not being attempted
+  fail: 
+    msg: > 
+      Downgrading WNT version is not supported. 
+      Please make sure that the WNT specified in vars/update_host.yml is greater than the one currently running on the system.
+  when: old_wnt_major | float > wnt_major | float
+
+- name: Check that the upgrade is attempted from the previous major version. This check is there to prevent unsupported upgrade paths from older versions of WNT
+  fail: 
+    msg: >
+      Upgrading to WNT 4 is not permitted from WNT version earlier that 3.0. 
+      Please upgrade to WNT3.0 before attempting the migration to WNT4.
+  when: old_wnt_major | float < 3.0
+
+###########################################
+#  Set WNT update type
+###########################################
+- name: Set update type to WNT 4.X to WNT4.Y
+  set_fact:
+    update_type: "update_from_wnt_4"
+  when: old_wnt_major | float >= 4.0
+
+- name: Set update type to WNT 3.X to WNT4.Y
+  set_fact:
+    update_type: "update_from_wnt_3"
+  when: old_wnt_major | float >= 3.0 and old_wnt_major | float < 4.0 
+
+###########################################
+#  Output version validation outcome
+###########################################
+- debug:
+    msg: "{{ item }}"
+  with_items:
+    - "Versions currently running: WNT:{{ old_wnt_full_version.stdout }}"
+    - "Versions to update to: WNT:{{ wnt_version }}"
+    - "Determined update type: {{ update_type }}"

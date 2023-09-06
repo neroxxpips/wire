@@ -1,0 +1,32 @@
+---
+- name: remove postgres db
+  command: "docker volume rm wnt_postgresdb"
+
+- name: docker compose up -d postgres
+  command: "docker compose up -d postgres"
+  args:
+    chdir: "{{ service_home }}"
+
+- name: unarchive postgres data
+  unarchive:
+    src: "{{ wnt_storage }}/{{ instance_name }}/metadata.tar.gz"
+    dest: "{{ service_home }}/backups/"
+
+- name: Sleep for 10 seconds to ensure db is up before dumping
+  wait_for:
+    timeout: 10
+  delegate_to: localhost
+
+- name: dump pgdata to docker postgres db
+  raw: cat {{ service_home }}/backups/postgres_dump_data_transfer.sql | docker exec -i wnt_postgres psql -U $(docker exec wnt_postgres bash -c 'echo "$POSTGRES_USER"')
+  when: not pg_metadata_only
+
+- name: dump pgdata to docker postgres db
+  raw: cat {{ service_home }}/backups/postgres_dump_data_transfer.sql | docker exec -i wnt_postgres psql -d wirepas-meta -U $(docker exec wnt_postgres bash -c 'echo "$POSTGRES_USER"')
+  when: pg_metadata_only is defined and pg_metadata_only
+
+
+- name: turn down wnt postgres after data restore
+  command: "docker compose down"
+  args:
+    chdir: "{{ service_home }}"

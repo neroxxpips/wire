@@ -1,0 +1,136 @@
+# Wirepas Oy 2022
+#
+# This play runs by default against a remote machine and install a set
+# of packages and then proceeds to update the needed WNT and WPE services.
+#
+# Example on how to run without an inventory file:
+#   ansible-playbook -i myinstance.mydnszone.com, cli_update_host.yml
+#
+
+---
+- hosts: all
+  gather_facts: False
+  remote_user: "{{ ssh_user | default('ubuntu') }}"
+  vars_files:
+    - "vars/update_host.yml"
+    - "vars/aws_account.yml"
+
+  # XXX Pre tasks are not relevant for Customer Selfhosting playbooks. This part is used in wirepas internal
+  pre_tasks:
+    - debug:
+        msg: "Using variables from vars/update_host.yml"
+    - name: "Fetch key for {{inventory_hostname_short}}"
+      raw: "aws --profile {{ aws_profile }} --region {{aws_region}} ssm get-parameter --name /wirepas/{{inventory_hostname_short}}-private-key --with-decryption --output json | jq -r .Parameter.Value > keys.pem && chmod 0600 keys.pem"
+      delegate_to: localhost
+      tags: [certs, services]
+      when: aws_profile is defined and aws_profile != ""
+
+  tasks:
+  ###################################################################
+  #  Pre update validation
+  ###################################################################
+    - name: Check the current user with which this playbook is executed
+      command: whoami
+      register: current_user
+      tags: always
+
+    - name: Terminate the playbook if executed as root
+      assert:
+        that:
+          - current_user.stdout != "root"
+        fail_msg: Playbook shouldn't be executed as root user. PLease do not use sudo to run the ansible-playbook command.
+        quiet: true
+      tags: always
+
+    # Docker needs to be updated since docker compose module is used from now on
+    - name: Update dependencies
+      import_role:
+        name: wirepas
+        tasks_from: host_maintenance
+      tags: dependencies
+
+    - name: Perform validation checks for WNT
+      import_role:
+        name: wnt
+        tasks_from: check_version
+
+    - name: Perform validation checks for WPE
+      import_role:
+        name: wpe
+        tasks_from: check_version
+      when: wpe_version is defined and wpe_version != None and wpe_version|string != "None"
+
+    - name: Update and validate AWS credentials
+      import_role:
+        name: credentials
+      tags: update_host_actions, aws_credentials
+      when: credential_check and credential_check|bool
+
+  ###################################################################
+  #  Update preparation when migrating from WNT3
+  ###################################################################
+    - name: Execute specific WNT3 to WNT4 migration preparation tasks
+      block:
+        - name: Backup postgres database and existing credentials (wnt.env and customer_report.rst)
+          import_role:
+            name: wnt
+            tasks_from: generate_failsafe_for_wnt.yml
+
+        - name: prepare for upgrade
+          import_role:
+            name: wnt
+            tasks_from: prepare_for_update_from_wnt3
+
+        - name: Enable anchor metadata migration for WPE enabled systems
+          set_fact:
+            transfer_wpe_anchor_metadata: true
+          when: wpe_version is defined and wpe_version != None and wpe_version|string != "None"
+
+        - name: run migrate script
+          import_role:
+            name: wnt
+            tasks_from: run_migrate_script
+          when: transfer_wpe_anchor_metadata|bool
+
+        - name: "Fail here if no update is set"
+          fail:
+            msg: |
+              "User set fail at this point since no_update parameter was given. "
+              "Ensure {{ wnt_storage }}/{{ instance_name }}/data.json has all the your anchor nodes before continuing without no_update flag"
+          when: no_update is defined and no_update|bool
+
+        - name: upgrade files from {{ wnt_old_major }} to {{ wnt_version }}
+          import_role:
+            name: wnt
+            tasks_from: update_from_wnt3
+
+        - name: Cleanup env file and copy it back to backend
+          import_role:
+            name: wnt
+            tasks_from: cleanup_env
+      when: update_type == "update_from_wnt_3"
+
+  ###################################################################
+  #  Perform WNT/WPE update
+  ###################################################################
+    - name: update WNT
+      import_role:
+        name: wnt
+        tasks_from: update_docker_services.yml
+      tags: wnt
+      when: wnt_version is defined and wnt_version != None and wnt_version|string != "None"
+
+    - name: update WPE
+      import_role:
+        name: wpe
+        tasks_from: update_docker_services.yml
+      tags: wpe
+      ignore_errors: true
+      when: wpe_version is defined and wpe_version != None and wpe_version|string != "None"
+
+    - name: import Anchordata to updated backend
+      import_role:
+        name: wnt
+        tasks_from: import_anchors_to_backend.yml
+      tags: wnt
+      when: update_type == "update_from_wnt_3" and transfer_wpe_anchor_metadata|bool

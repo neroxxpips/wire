@@ -1,0 +1,10 @@
+# mount to /mosquitto/config/acl
+
+user mosquittouser
+topic read gw-request/#
+topic write gw-event/#
+topic write gw-response/#
+
+user mqttmasteruser
+topic readwrite #
+topic read $SYS/#

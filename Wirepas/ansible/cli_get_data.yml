@@ -1,0 +1,31 @@
+# Wirepas Oy 2020
+#
+#
+# Example on how to run without an inventory file:
+#   ansible-playbook -i myinstance.mydnszone.com, cli_get_data.yml --tags postgres
+#
+
+---
+- hosts: all
+  gather_facts: False
+  remote_user: "{{ ssh_user | default('ubuntu') }}"
+  vars_files:
+    - "vars/setup_host.yml"
+    - "vars/aws_account.yml"
+  vars:
+    - pg_metadata_only: false
+
+  # XXX Pre tasks are not relevant for Customer Selfhosting playbooks. This part is used in wirepas internal
+  pre_tasks:
+    - name: "Fetch key for {{inventory_hostname_short}}"
+      raw: "aws --profile {{ aws_profile }} --region {{aws_region}} ssm get-parameter --name /wirepas/{{inventory_hostname_short}}-private-key --with-decryption --output json | jq -r .Parameter.Value > keys.pem && chmod 0600 keys.pem"
+      delegate_to: localhost
+      tags: [postgres, influx, mqtt]
+      when: aws_profile is defined and aws_profile != ""
+
+  tasks:
+
+    - name: tranfer data from wnt
+      import_role:
+        name: wnt
+        tasks_from: get_data

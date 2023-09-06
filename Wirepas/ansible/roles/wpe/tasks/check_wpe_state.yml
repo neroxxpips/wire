@@ -1,0 +1,23 @@
+---
+- name: "Check WPE state"
+  command: "docker compose ps --format json"
+  args:
+    chdir: "{{ service_home }}"
+  register: compose_output
+
+- set_fact:
+    wpe_services_status: "{{ compose_output.stdout|from_json }}"
+- name: Populate statuses dict
+  set_fact:
+    wpe_statuses_dict: "{{ wpe_statuses_dict|default({}) | combine( {item.Name: item.State} ) }}"
+  with_items: "{{ wpe_services_status }}"
+- debug:
+    msg: "STATUSES: {{ wpe_statuses_dict }}:{{ wpe_statuses_dict['wpe-core'] }}"
+- set_fact:
+    wpe_running: false
+- set_fact:
+    wpe_running: true
+  when: >
+    wpe_statuses_dict['wpe-flow'] is defined and wpe_statuses_dict['wpe-flow'] == "running" and
+    wpe_statuses_dict['wpe-subscriber'] is defined and wpe_statuses_dict['wpe-subscriber'] == "running" and
+    wpe_statuses_dict['wpe-core'] is defined and wpe_statuses_dict['wpe-core'] == "running"

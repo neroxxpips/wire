@@ -1,0 +1,14 @@
+# Wirepas Oy 2021
+#
+# Cleanup server after play
+#
+# Wirepas Oy
+---
+- name: Remove unnecessary files
+  file:
+    path: "{{ service_home }}/{{ item }}"
+    state: absent
+  loop:
+    - "generate_user_keys.sh"
+    - "quotify_wnt_env_passwordhash.sh"
+  failed_when: false

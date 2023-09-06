@@ -1,0 +1,13 @@
+---
+
+- name: remove verne db
+  command: "docker volume rm wnt_vernemq_data"
+  ignore_errors: true
+
+- name: unarchive verne db to host
+  unarchive:
+    src: "{{ wnt_storage }}/{{ instance_name }}/verne.tar.gz"
+    dest: "/"
+  become: true
+  become_method: sudo
+

@@ -1,0 +1,43 @@
+---
+
+- name: sync diagnostics
+  synchronize:
+    mode: push
+    src: "{{ wnt_storage }}/{{ instance_name }}/influx_backup"
+    dest: "{{ service_home }}/backups/"
+
+- name: remove influx db
+  command: "docker volume rm wnt_influxdb"
+
+- name: docker compose up -d influx
+  command: "docker compose up -d influx"
+  args:
+    chdir: "{{ service_home }}"
+
+- name: Sleep for 10 seconds to ensure db is up before dumping
+  wait_for:
+    timeout: 10
+  delegate_to: localhost
+
+- name: copy influxdb backup to container
+  command: "docker cp {{ service_home }}/backups/influx_backup wnt_influx:influx_backup"
+
+- name: drop wirepas db to be able to restore
+  raw: docker exec -t wnt_influx influx --username $(docker exec wnt_influx sh -c 'echo "$INFLUXDB_ADMIN_USER"') --password $(docker exec wnt_influx sh -c 'echo "$INFLUXDB_ADMIN_PASSWORD"') --database wirepas -execute "DROP DATABASE wirepas"
+
+- name: Sleep for 10 seconds to ensure db is up before dumping
+  wait_for:
+    timeout: 10
+  delegate_to: localhost
+
+- name: dump influx backup to docker container
+  raw: docker exec -t wnt_influx sh -c "influxd restore -portable -db wirepas influx_backup"
+
+- name: grant access to influxdb (command will fail at last step, but that is expected)
+  raw: docker exec -t wnt_influx sh -c "./docker-entrypoint-initdb.d/init_influx.sh"
+  ignore_errors: true
+
+- name: turn down wnt influx after data restore
+  command: "docker compose down"
+  args:
+    chdir: "{{ service_home }}"

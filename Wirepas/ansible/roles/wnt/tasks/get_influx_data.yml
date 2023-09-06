@@ -1,0 +1,22 @@
+---
+- name: dump influxdb data
+  shell: "docker exec -t wnt_influx influxd backup -portable influx_backup"
+
+- name: copy influxdb backup to host
+  shell: "docker cp wnt_influx:influx_backup {{ service_home }}/backups/influx_backup"
+
+- name: rm influxdb backup from container
+  shell: "docker exec -t wnt_influx rm -rf {{ service_home }}/backups/influx_backup"
+
+- name: sync diagnostics
+  synchronize:
+    mode: pull
+    src: "{{ service_home }}/backups/influx_backup"
+    dest: "{{ wnt_storage }}/{{ instance_name }}/"
+
+- name: remove influx transfer files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ service_home }}/backups/influx_backup"

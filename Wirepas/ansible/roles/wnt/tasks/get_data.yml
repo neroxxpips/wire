@@ -1,0 +1,28 @@
+---
+- name: check for {{ wnt_storage }}
+  file:
+    path: "{{ wnt_storage }}/{{ instance_name }}"
+    state: directory
+    mode: 0755
+  delegate_to: localhost
+  tags: [postgres, influx, mqtt]
+
+- name: get verne data
+  import_tasks: get_verne_data.yml
+  tags: [mqtt]
+
+- name: get postgres data
+  import_tasks: get_postgres_data.yml
+  tags: [postgres]
+
+- name: get influx data
+  import_tasks: get_influx_data.yml
+  tags: [influx]
+
+- name: fetch wnt.env
+  fetch:
+    src: "{{ service_home }}/wnt.env"
+    dest: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    flat: yes
+  tags: [postgres, influx, mqtt]
+

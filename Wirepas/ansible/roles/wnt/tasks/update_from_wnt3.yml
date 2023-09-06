@@ -1,0 +1,18 @@
+# Wirepas Oy 2022
+#
+# Update WNT3 to WNT4 changes
+#
+# Wirepas Oy
+---
+
+# generated in prepare for upgrade
+- name: Store MQTT_JSON credentials
+  import_tasks: store_mqtt_credentials.yml
+  when: check.results[0].found == 0
+
+- name: create customer report file for json api
+  template:
+    src: "json_api_part.j2"
+    dest: "{{ service_home }}/json_api_part.rst"
+  when: check.results[0].found == 0
+

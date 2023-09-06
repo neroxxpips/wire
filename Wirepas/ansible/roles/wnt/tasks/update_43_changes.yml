@@ -1,0 +1,20 @@
+---
+
+- name: Update wnt.env to contain updated for 4.3
+  lineinfile:
+    path: "{{ service_home }}/wnt.env"
+    backup: yes
+    line: "{{ item.line }}"
+    create: no
+  with_items:
+    - {
+      line: 'INFLUXDB_STORE_REMOTE_API_RESPONSES={{ wnt_influx_remote_api_responses | bool | string | lower }}'
+    }
+    - {
+      line: 'MQTT_PERSISTENT_CLIENT_EXPIRATION={{ wnt_mqtt_persistent_client_expiration }}'
+    }
+
+- name: Update hashed passwords to contains single quotes
+  shell: "./quotify_wnt_env_passwordhash.sh > quotified_wnt.env && cp quotified_wnt.env wnt.env && rm quotified_wnt.env"
+  args:
+    chdir: "{{ service_home }}"

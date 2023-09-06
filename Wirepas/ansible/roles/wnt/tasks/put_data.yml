@@ -1,0 +1,32 @@
+---
+- name: docker compose down
+  command: "docker compose down"
+  args:
+    chdir: "{{ service_home }}"
+  tags: [postgres, influx, mqtt]
+
+- name: copy wnt_env to backend
+  copy:
+    src: "{{ wnt_storage }}/{{ instance_name }}/wnt.env"
+    dest: "{{ service_home }}/wnt.env"
+    mode: 0664
+  tags: [postgres, influx, mqtt]
+  when: not pg_metadata_only
+
+- name: put verne data
+  import_tasks: put_verne_data.yml
+  tags: mqtt
+
+- name: put postgres data
+  import_tasks: put_postgres_data.yml
+  tags: postgres
+
+- name: put influx data
+  import_tasks: put_influx_data.yml
+  tags: influx
+
+- name: turn up wnt services
+  command: "docker compose up -d"
+  args:
+    chdir: "{{ service_home }}"
+  tags: [postgres, influx, mqtt]

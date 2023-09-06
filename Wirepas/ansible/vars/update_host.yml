@@ -1,0 +1,40 @@
+---
+ansible_python_interpreter: /usr/bin/python3
+
+instance_admin_user: "ubuntu" # your remote install admin user
+ansible_ssh_private_key_file: "./keys.pem" # private key to access remote
+
+# If you wish to skip wpe installation set wpe_version to None or empty
+wnt_version: "4.3"
+wpe_version: "1.6"
+
+# report and credentials
+encrypt_local_files: false
+wnt_storage: "{{ playbook_dir }}/wnt" # wnt files will be copied here
+wpe_storage: "{{ playbook_dir }}/wpe" # wpe files will be copied here
+
+# These variables are populated from your host name. They assume it
+# follows the pattern: name.domain.country
+instance_split: "{{ inventory_hostname.split('.') }}"
+instance_name: "{{ instance_split[0] }}"
+instance_dns_zone: "{{ '.'.join(instance_split[1:]) }}"
+instance_domain_name: "{{ inventory_hostname }}"
+
+# We rewrite compose file in update, so this check is just to tell if we add haproxy to it
+# so any other selection than no_cert will generate the haproxy section here
+# updates don't support changing the type of certificate used
+# valid choises are [any, no_cert]
+certificate: "any"
+
+# these 3 parameters are WPE specific.
+# they run migration script that transfers WPE anchor node metadata from WNT 3 to WNT 4
+transfer_wpe_anchor_metadata: false
+# in case you have untrusted self signed certificates you need to ignore certificate check
+# or run script manually.
+# Automation does not cover the self-signed certs in migration
+# contact Wirepas support in case you don't want to ignore cert and still need migration
+ignore_migrationscript_certificate_check: false
+# this feature can be used if user is interested to run only migration script with automation
+# but does not want to update the backend just yet
+# this will generate anchordata file to review but does not update backend
+no_update: false

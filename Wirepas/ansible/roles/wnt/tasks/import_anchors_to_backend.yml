@@ -1,0 +1,11 @@
+---
+- name: Set WPE anchor node roles to remote
+  command: '.env/bin/python3 anchordataimporter.py --settings "{{ wnt_storage }}/{{ instance_name }}/anchor_export_import.yml"'
+  args:
+    chdir: "../migration_script"
+  delegate_to: localhost
+  register: import_retval
+
+- name: Print Return value of the import script
+  ansible.builtin.debug:
+    msg: "{{ import_retval }}"

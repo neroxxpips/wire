@@ -1,0 +1,36 @@
+---
+- name: dump postgres data
+  raw: docker exec -t wnt_postgres pg_dumpall -c -U $(docker exec wnt_postgres bash -c 'echo "$POSTGRES_USER"') > {{service_home}}/backups/postgres_dump_data_transfer.sql
+  when: not pg_metadata_only
+
+- name: dump postgres metadata only
+  raw: docker exec -t wnt_postgres pg_dump wirepas-meta -c -U $(docker exec wnt_postgres bash -c 'echo "$POSTGRES_USER"') > {{service_home}}/backups/postgres_dump_data_transfer.sql
+  when: pg_metadata_only is defined and pg_metadata_only
+
+# Getting this to work would skip nest 2 steps
+#- name: archive postgres backup
+#  archive:
+#    path:
+#      - "{{ service_home }}/backups/postgres_dump_data_transfer.sql"
+#    dest: "{{ wnt_storage }}/metadata.tar.gz"
+#    format: gz
+#    remote_src: yes
+
+- name: pack postgres backup
+  shell: "tar -czf metadata.tar.gz --directory={{ service_home }}/backups postgres_dump_data_transfer.sql"
+  args:
+    chdir: "{{ service_home }}/backups"
+
+- name: fetch metadata
+  fetch:
+    src: "{{ service_home }}/backups/metadata.tar.gz"
+    dest: "{{ wnt_storage }}/{{ instance_name }}/metadata.tar.gz"
+    flat: yes
+
+- name: remove postgres transfer files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ service_home }}/backups/postgres_dump_data_transfer.sql"
+    - "{{ service_home }}/backups/metadata.tar.gz"

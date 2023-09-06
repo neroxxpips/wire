@@ -1,0 +1,46 @@
+export_environment:
+  protocol_version: 4
+  PROTOCOL: "{{ wnt_websocket_protocol }}"
+{% if wnt_websocket_protocol == "wss" %}
+  AUTHENTICATION_PORT: 8813
+  METADATA_PORT: 8812
+  REALTIME_SITUATION_PORT: 8811
+{% else %}
+  AUTHENTICATION_PORT: {{ included_wnt_vars.AUTH_MANAGER_PUBLIC_PORT }}
+  METADATA_PORT: {{ included_wnt_vars.METADATA_MANAGER_PORT }}
+  REALTIME_SITUATION_PORT: {{ included_wnt_vars.FEROUTER_PUBLIC_PORT }}
+{% endif %}
+  log_level: "debug"
+  log_file_name: "{{ wnt_storage }}/{{ instance_name }}/export_environment.log"
+  with_trace: False
+  timeout_minutes: 5
+  data_file_name: "{{ wnt_storage }}/{{ instance_name }}/data.json"
+  username: "{{ included_wnt_vars.WNT_ADMIN_USERNAME }}"
+  password: "{{ included_wnt_vars.WNT_ADMIN_PASSWORD }}"
+  hostname: "{{ instance_domain_name }}"
+  ignore_cert: {{ ignore_migrationscript_certificate_check }}
+  ca_certs: ""
+import_environment:
+  protocol_version: 5
+  PROTOCOL: "{{ wnt_websocket_protocol }}"
+{% if wnt_websocket_protocol == "wss" %}
+  AUTHENTICATION_PORT: 8813
+  METADATA_PORT: 8812
+  REALTIME_SITUATION_PORT: 8811
+{% else %}
+  AUTHENTICATION_PORT: {{ included_wnt_vars.AUTH_MANAGER_PUBLIC_PORT }}
+  METADATA_PORT: {{ included_wnt_vars.METADATA_MANAGER_PORT }}
+  REALTIME_SITUATION_PORT: {{ included_wnt_vars.FEROUTER_PUBLIC_PORT }}
+{% endif %}
+  log_level: "debug"
+  log_file_name: "{{ wnt_storage }}/{{ instance_name }}/import_environment.log"
+  with_trace: False
+  timeout_minutes: 5
+  data_file_name: "{{ wnt_storage }}/{{ instance_name }}/data.json"
+  username: "{{ included_wnt_vars.WNT_ADMIN_USERNAME }}"
+  password: "{{ included_wnt_vars.WNT_ADMIN_PASSWORD }}"
+  hostname: "{{ instance_domain_name }}"
+  batch_size: 200
+  batch_delay_seconds: 1.0
+  ignore_cert: {{ ignore_migrationscript_certificate_check }}
+  ca_certs: ""
